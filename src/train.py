@@ -14,6 +14,15 @@ def train(
     data_path: str = "data/train_phase1.csv",
     eval_path: str = "data/eval.csv",
 ) -> float:
+    # --- Bonus 1: Tracking MLflow Từ Xa Với DagsHub ---
+    if os.environ.get("MLFLOW_TRACKING_URI") and "dagshub.com" in os.environ.get("MLFLOW_TRACKING_URI"):
+        import dagshub
+        dagshub.init(repo_owner='nvthach121', repo_name='Day21-Track2-CI-CD-for-AI-Systems', frontline=True)
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+        print(f"Tracking to DagsHub MLflow: {os.environ.get('MLFLOW_TRACKING_URI')}")
+    elif os.environ.get("MLFLOW_TRACKING_URI"):
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+    
     # --- Bonus 5: Canh bao lech lac du lieu ---
     df_train = pd.read_csv(data_path)
     df_eval  = pd.read_csv(eval_path)
