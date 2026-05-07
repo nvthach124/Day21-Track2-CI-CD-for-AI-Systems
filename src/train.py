@@ -19,6 +19,7 @@ def train(
         import dagshub
         dagshub.init(repo_owner='nvthach121', repo_name='Day21-Track2-CI-CD-for-AI-Systems', frontline=True)
         mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+        mlflow.set_experiment("Wine-Quality-Experiments")
         print(f"Tracking to DagsHub MLflow: {os.environ.get('MLFLOW_TRACKING_URI')}")
     elif os.environ.get("MLFLOW_TRACKING_URI"):
         mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
