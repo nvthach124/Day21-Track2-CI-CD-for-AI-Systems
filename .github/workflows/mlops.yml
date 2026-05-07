@@ -58,31 +58,63 @@ jobs:
           ACC=$(python -c "import json; print(json.load(open('outputs/metrics.json'))['accuracy'])")
           echo "accuracy=$ACC" >> $GITHUB_OUTPUT
 
-      - name: Upload model to S3
+      - name: Upload artifacts to S3
         run: |
           aws s3 cp models/model.pkl s3://${{ secrets.CLOUD_BUCKET }}/models/latest/model.pkl
+          aws s3 cp outputs/metrics.json s3://${{ secrets.CLOUD_BUCKET }}/models/latest/metrics.json
 
-      - name: Save metrics as artifact
+      - name: Save artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: metrics
-          path: outputs/metrics.json
+          name: ml_outputs
+          path: |
+            outputs/metrics.json
+            outputs/report.txt
 
   eval:
     name: Eval
     needs: train
     runs-on: ubuntu-latest
     steps:
-      - name: Check eval gate
+      - name: Authenticate to AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Check rollback and threshold
         run: |
           python - <<EOF
+          import json
+          import os
           import sys
-          acc = float("${{ needs.train.outputs.accuracy }}")
-          if acc < 0.70:
-              print(f"Accuracy {acc:.4f} is below threshold 0.70. Deployment blocked.")
+          import subprocess
+
+          current_acc = float("${{ needs.train.outputs.accuracy }}")
+          print(f"Current Accuracy: {current_acc:.4f}")
+
+          # Check basic threshold
+          if current_acc < 0.70:
+              print("❌ FAILED: Accuracy below threshold 0.70.")
               sys.exit(1)
-          else:
-              print(f"Accuracy {acc:.4f} meets threshold. Proceeding to deployment.")
+
+          # --- Bonus 4: Hoàn trả về phiên bản trước ---
+          try:
+              print("Checking for previous metrics on S3...")
+              subprocess.run(["aws", "s3", "cp", "s3://${{ secrets.CLOUD_BUCKET }}/models/latest/metrics.json", "prev_metrics.json"], check=True)
+              with open("prev_metrics.json") as f:
+                  prev_acc = json.load(f)["accuracy"]
+              print(f"Previous Accuracy: {prev_acc:.4f}")
+              
+              if current_acc < prev_acc:
+                  print(f"❌ ROLLBACK: New accuracy ({current_acc:.4f}) is lower than current production accuracy ({prev_acc:.4f}).")
+                  sys.exit(1)
+              else:
+                  print("✅ SUCCESS: New model is better or equal to production model.")
+          except Exception as e:
+              print(f"No previous metrics found or error occurred: {e}. Proceeding as first deployment.")
+
           EOF
 
   deploy:
