@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+[remote "myremote"]
+    url = s3://mlops-lab-bucket-670484892447/dvc
